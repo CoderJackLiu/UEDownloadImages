@@ -14,6 +14,9 @@ This plugin is designed to address the limitations of Unreal Engine's native sin
 ## Compatibility
 - Developed using Unreal Engine 5.1, this plugin should be easily adaptable to Unreal Engine 4 and higher versions of Unreal Engine 5. Developers interested in contributing can add branches for other versions.
 
+## Example
+- Open the `UEDownloadImagesExample` map located in the Content directory of the plugin. Run the game, and click to execute to see the effect. For specific usage, please refer to the BP_UEDownloadImagesController under GameMode.
+
 ## Feedback and Suggestions
 - For additional feature requests or suggestions, feel free to leave a message in the issues section.
 
@@ -36,6 +39,10 @@ While not common in game development, this plugin can quickly address specific n
 
 ## 兼容性
 - 本插件使用虚幻引擎5.1开发，由于未广泛使用API，因此应易于修改以适用于虚幻4和虚幻5的更高版本。对此感兴趣的开发者可参与添加其他版本的分支。
+
+## 示例
+- 打开插件Content目录下的 `UEDownloadImagesExample` 地图，运行游戏，点击运行即可看到效果，具体调用请参阅GameMode下面的BP_UEDownloadImagesController。
+
 
 ## 交流与建议
 - 如对本插件有更多的功能需求或建议，欢迎在issues区留言讨论。
