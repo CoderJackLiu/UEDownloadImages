@@ -15,7 +15,7 @@
 class FXDownLoaderModule : public IModuleInterface
 {
 public:
-
+	static void RegisterXDownloaderSettings();
 	/** IModuleInterface implementation */
 	virtual void StartupModule() override;
 	virtual void ShutdownModule() override;
