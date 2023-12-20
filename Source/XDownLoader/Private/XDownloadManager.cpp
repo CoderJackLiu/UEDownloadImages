@@ -29,11 +29,13 @@ UXDownloadManager* UXDownloadManager::DownloadImages(const TArray<FImageDownload
 void UXDownloadManager::StartDownload(const TArray<FImageDownloadTask>& Tasks, int32 MaxDownloads)
 {
 	//get game instance subsystem
-	UXDownloaderSubsystem* DownloaderSubsystem = UGameInstance::GetSubsystem<UXDownloaderSubsystem>(GetGameWorld()->GetGameInstance());
+	if (!IsGameWorldValid())
+	{
+		return;
+	}
+	UXDownloaderSubsystem* DownloaderSubsystem = UGameInstance::GetSubsystem<UXDownloaderSubsystem>(GameWorld->GetGameInstance());
 	DownloaderSaveGame = DownloaderSubsystem->GetSaveGame();
 
-	// CurrentTasks = Tasks;
-	// 当前整个类下载数量
 	CurrentParallelDownloads = 0;
 
 	TotalDownloadResult.TotalNum = Tasks.Num();
@@ -62,9 +64,6 @@ void UXDownloadManager::OnSubTaskFinished(TSharedPtr<IHttpRequest> HttpRequest, 
 			bStopDownload = true;
 			return;
 		}
-		// ...
-		// 下载完成的处理逻辑
-		// ...
 		FDownloadResult Result;
 		Result.ImageID = ImageID;
 		Result.ImageURL = ImageURL;
@@ -84,7 +83,6 @@ void UXDownloadManager::OnSubTaskFinished(TSharedPtr<IHttpRequest> HttpRequest, 
 				ImageCached.ImageURL = ImageURL;
 				ImageCached.ImageData = Content;
 				DownloaderSaveGame->AddImageCache(ImageCached);
-				//todo Result.Texture
 				MakeSubTaskSucceed(Result);
 			}
 			else
@@ -103,7 +101,6 @@ void UXDownloadManager::OnSubTaskFinished(TSharedPtr<IHttpRequest> HttpRequest, 
 
 void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 {
-
 	AsyncTask(ENamedThreads::BackgroundThreadPriority, [this,Task]()
 	{
 		if (DownloaderSaveGame->HasImageCache(Task.ImageID))
@@ -122,20 +119,15 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 		}
 		else
 		{
-			// ...
-		   // 下载逻辑
-		   // ...
-		   const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
-		   DownLoadRequests.Add(HttpRequest);
-		   HttpRequest->SetURL(Task.ImageURL);
-		   HttpRequest->SetVerb(TEXT("GET"));
-
-		   HttpRequest->OnRequestProgress().BindUObject(this, &UXDownloadManager::MakeSubTaskProgress, Task.ImageID);
-
-		   HttpRequest->OnProcessRequestComplete().BindUObject(this, &UXDownloadManager::OnSubTaskFinished, Task.ImageID, Task.ImageURL);
-		   HttpRequest->SetHeader("ImageID", Task.ImageID);
-		   HttpRequest->SetHeader("ImageURL", Task.ImageURL);
-		   HttpRequest->ProcessRequest();
+			const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+			DownLoadRequests.Add(HttpRequest);
+			HttpRequest->SetURL(Task.ImageURL);
+			HttpRequest->SetVerb(TEXT("GET"));
+			HttpRequest->OnRequestProgress().BindUObject(this, &UXDownloadManager::MakeSubTaskProgress, Task.ImageID);
+			HttpRequest->OnProcessRequestComplete().BindUObject(this, &UXDownloadManager::OnSubTaskFinished, Task.ImageID, Task.ImageURL);
+			HttpRequest->SetHeader("ImageID", Task.ImageID);
+			HttpRequest->SetHeader("ImageURL", Task.ImageURL);
+			HttpRequest->ProcessRequest();
 		}
 	});
 }
@@ -153,31 +145,22 @@ void UXDownloadManager::InitTask()
 
 void UXDownloadManager::DestroyTask()
 {
-	// ...
-	// 销毁逻辑
-	// ...
 	InitTask();
 	for (const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> DownLoadRequest : DownLoadRequests)
 	{
 		DownLoadRequest->OnProcessRequestComplete().Unbind();
 		DownLoadRequest->OnRequestProgress().Unbind();
 		DownLoadRequest.Get().CancelRequest();
-		//log
 		UE_LOG(LogTemp, Warning, TEXT("DownloadManager http request unbind  url is  %s !!!!"), *DownLoadRequest->GetURL());
 	}
 	DownLoadRequests.Empty();
 	GameWorld = nullptr;
-	//log destroy func
 	UE_LOG(LogTemp, Warning, TEXT("DownloadManager Destroy!!!"));
 	RemoveFromRoot();
 }
 
 void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 {
-	// ...
-	// 完成的处理逻辑
-	// ...
-	//log succeed
 	FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
 	{
 		FPlatformAtomics::InterlockedDecrement(&CurrentParallelDownloads);
@@ -188,11 +171,8 @@ void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 		if (!IsGameWorldValid())
 		{
 			DestroyTask();
-
 			return;
 		}
-
-
 		if (CurrentParallelDownloads == 0)
 		{
 			MakeAllTaskFinished();
@@ -204,7 +184,6 @@ void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 			{
 				FPlatformAtomics::InterlockedIncrement(&CurrentParallelDownloads);
 				ExecuteDownloadTask(Task);
-				// CurrentTasks.Remove(Task);
 			}
 		}
 	}
@@ -212,10 +191,6 @@ void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 
 void UXDownloadManager::MakeSubTaskError(const FDownloadResult& InTaskResult)
 {
-	// ...
-	// 错误处理逻辑
-	// 继续执行下一个任务
-	// ...
 	FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
 	{
 		//log error
@@ -237,7 +212,6 @@ void UXDownloadManager::MakeSubTaskError(const FDownloadResult& InTaskResult)
 			if (TaskQueue.Dequeue(Task))
 			{
 				ExecuteDownloadTask(Task);
-				// CurrentTasks.Remove(Task);
 			}
 		}
 	}
@@ -245,12 +219,8 @@ void UXDownloadManager::MakeSubTaskError(const FDownloadResult& InTaskResult)
 
 void UXDownloadManager::UpdateAllProgress()
 {
-	// ...
-	// 进度更新逻辑
-	// ...
 	AsyncTask(ENamedThreads::GameThread, [this]()
 	{
-		//log progress
 		UE_LOG(LogTemp, Warning, TEXT("Download progress!!!"));
 		OnTotalDownloadProgress.Broadcast(TotalDownloadResult);
 	});
@@ -281,18 +251,12 @@ void UXDownloadManager::MakeAllTaskFinished()
 
 void UXDownloadManager::MakeSubTaskProgress(FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived, FString ImageID)
 {
-	// ...
-	// 请求进度更新逻辑
-	// ...
-
-	//log progress
 	if (!IsGameWorldValid())
 	{
 		DestroyTask();
 		return;
 	}
 	const float Progress = static_cast<float>(BytesReceived) / static_cast<float>(Request->GetResponse()->GetContentLength());
-	// UE_LOG(LogTemp, Warning, TEXT("Download progress!!! ImageID :%s ,Progress:%f"), *ImageID, Progress);
 }
 
 bool UXDownloadManager::IsGameWorldValid()
@@ -363,7 +327,6 @@ UTexture2DDynamic* UXDownloadManager::LoadImageFromBuffer(const TArray<uint8>& I
 				{
 					Texture->SRGB = true;
 					Texture->UpdateResource();
-
 					FTexture2DDynamicResource* TextureResource = static_cast<FTexture2DDynamicResource*>(Texture->GetResource());
 					if (TextureResource)
 					{
