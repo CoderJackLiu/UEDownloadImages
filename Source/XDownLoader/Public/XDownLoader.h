@@ -5,6 +5,13 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
+/**
+ * @class FXDownLoaderModule
+ * @brief A class that represents a module for downloading files.
+ *
+ * This class is derived from the IModuleInterface class and provides implementation for
+ * the StartupModule and ShutdownModule methods.
+ */
 class FXDownLoaderModule : public IModuleInterface
 {
 public:

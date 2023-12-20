@@ -7,10 +7,12 @@
 #include "XDownloaderTypes.generated.h"
 
 /**
- * 
+ * @struct FDownloadProgress
+ * @brief Data structure representing the download progress of an image.
+ *
+ * This struct is used to store the ID of an image being downloaded and the percentage
+ * of completion of the download process.
  */
-
-
 USTRUCT(BlueprintType)
 struct FDownloadProgress
 {
@@ -23,6 +25,20 @@ struct FDownloadProgress
 	float PercentComplete; // 进度百分比
 };
 
+/**
+ * \struct FImageDownloadTask
+ * \brief Represents a task for downloading an image.
+ *
+ * This struct contains the necessary information to download an image, such as the URL and ID of the image.
+ *
+ * \var FImageDownloadTask::ImageURL
+ *     The URL of the image to download.
+ *
+ * \var FImageDownloadTask::ImageID
+ *     The ID of the image.
+ *
+ * \see FImageDownloader
+ */
 USTRUCT(BlueprintType)
 struct FImageDownloadTask
 {
@@ -42,6 +58,13 @@ struct FImageDownloadTask
 	}
 };
 
+/**
+ * @enum EDownloadStatus
+ * @brief Represents the status of a download operation.
+ *
+ * This enumeration provides predefined values to represent different stages of a download process.
+ * Each value is associated with a display name that can be used for user-friendly purposes.
+ */
 UENUM(BlueprintType)
 enum class EDownloadStatus : uint8
 {
@@ -51,6 +74,13 @@ enum class EDownloadStatus : uint8
 	Failed UMETA(DisplayName = "Failed")
 };
 
+/**
+ * @struct FDownloadResult
+ * @brief Represents the result of a download operation.
+ *
+ * FDownloadResult stores relevant information about a downloaded image, including its status, error message (if any),
+ * image ID, URL, downloaded image data, and the resulting texture.
+ */
 USTRUCT(BlueprintType)
 struct FDownloadResult
 {
@@ -76,7 +106,10 @@ struct FDownloadResult
 	UTexture2D* Texture = nullptr;
 };
 
-//total download Result
+/**
+ * @struct FTotalDownloadResult
+ * @brief Structure representing the result of a total download operation
+ */
 USTRUCT(BlueprintType)
 struct FTotalDownloadResult
 {
@@ -90,7 +123,12 @@ struct FTotalDownloadResult
 	int32 TotalNum = 0;
 };
 
-//image cached
+/**
+ * @struct FXDownloadImageCached
+ * @brief Represents a cached image for download
+ *
+ * This structure is used to store cached image information for downloads. It includes the image ID, URL, optional time, image data, and texture.
+ */
 USTRUCT(BlueprintType)
 struct FXDownloadImageCached
 {
@@ -133,8 +171,3 @@ struct FXDownloadImageCached
 };
 
 
-UCLASS()
-class XDOWNLOADER_API UImageDownloaderTypes : public UObject
-{
-	GENERATED_BODY()
-};

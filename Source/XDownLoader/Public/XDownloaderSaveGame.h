@@ -8,7 +8,8 @@
 #include "XDownloaderSaveGame.generated.h"
 
 /**
- *
+ * @class UXDownloaderSaveGame
+ * @brief A save game class used by the UXDownloader for caching image data.
  */
 UCLASS()
 class XDOWNLOADER_API UXDownloaderSaveGame : public USaveGame
