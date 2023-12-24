@@ -6,6 +6,22 @@
 #include "UObject/Object.h"
 #include "XDownloaderTypes.generated.h"
 
+
+/**
+ * @enum ECacheType
+ * @brief Enumerates the different cache types.
+ *
+ * The ECacheType enum class defines the different cache types that can be used in the application.
+ * It is used to indicate the type of cache to be used for storing data.
+ */
+UENUM(BlueprintType)
+enum class ECacheType : uint8
+{
+	CT_SaveGame UMETA(DisplayName = "SaveGame"),
+	CT_LocalFile UMETA(DisplayName = "LocalFile"),
+	CT_BothSaveGameAndFile UMETA(DisplayName = "Both")
+};
+
 /**
  * @struct FDownloadProgress
  * @brief Data structure representing the download progress of an image.
@@ -169,5 +185,3 @@ struct FXDownloadImageCached
 	//load texture from image data
 	void LoadTextureFromImageData();
 };
-
-

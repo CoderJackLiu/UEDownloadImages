@@ -8,6 +8,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "XDownloaderSubsystem.generated.h"
 
+class UXDownloaderSettings;
 /**
  * @class UXDownloaderSubsystem
  * @brief A class representing the downloader subsystem of the XDownloader API in Unreal Engine.
@@ -32,13 +33,43 @@ protected:
 private:
 
 public:
-	static UXDownloaderSaveGame* LoadSaveGame();
+	static UXDownloaderSaveGame* LoadSaveGame(const FString& InSlotName);
 
-	UXDownloaderSaveGame* GetSaveGame();
+	/**
+	 * @brief Retrieves the save game data.
+	 *
+	 * This method retrieves the save game data from the UXDownloaderSubsystem.
+	 * If the save game data is not loaded yet, it loads the save game data and initializes the image caches.
+	 *
+	 * @return A pointer to the UXDownloaderSaveGame object containing the save game data.
+	 */
+	UXDownloaderSaveGame* GetSaveGame(const FString& InSlotName="");
 
-	bool SaveSaveGame();
+	/**
+	 * @brief Retrieves the XDownload settings.
+	 *
+	 * This method retrieves the XDownload settings from the UXDownloaderSubsystem.
+	 * If the settings have not been set yet, it initializes the settings with the default values.
+	 *
+	 * @return A pointer to the UXDownloaderSettings object containing the XDownload settings.
+	 */
+	UXDownloaderSettings* GetXDownloadSettings();
 
 private:
+	/**
+	 * @struct FXDownloadImageCached
+	 * This struct represents the cached data for a downloaded image.
+	 */
 	UPROPERTY(BlueprintReadOnly, Category="XDownloader", meta=(AllowPrivateAccess=true))
 	UXDownloaderSaveGame* XDownloaderSaveGame;
+
+
+	/**
+	 * @class XDownloaderSettings
+	 * @brief Represents the settings for the XDownloader subsystem.
+	 *
+	 * The XDownloaderSettings class is responsible for storing and managing the settings for the XDownloader subsystem.
+	 */
+	UPROPERTY(BlueprintReadOnly, Category="XDownloader", meta=(AllowPrivateAccess=true))
+	UXDownloaderSettings* XDownloaderSettings;
 };

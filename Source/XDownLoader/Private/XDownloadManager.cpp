@@ -5,6 +5,7 @@
 #include "IImageWrapperModule.h"
 #include "ImageUtils.h"
 #include "XDownloaderSaveGame.h"
+#include "XDownloaderSettings.h"
 #include "XDownloaderSubsystem.h"
 #include "Engine/Texture2DDynamic.h"
 #include "Interfaces/IHttpRequest.h"
@@ -16,29 +17,43 @@ static FCriticalSection ExecutingXDownloadTaskPoolLock;
 TQueue<FImageDownloadTask> UXDownloadManager::TaskQueue;
 UWorld* UXDownloadManager::GameWorld = nullptr;
 
-UXDownloadManager* UXDownloadManager::DownloadImages(const TArray<FImageDownloadTask>& Tasks)
+void UXDownloadManager::InitParas(const FString& InSaveGameSlotName)
+{
+	DownloaderSubsystem = UGameInstance::GetSubsystem<UXDownloaderSubsystem>(GameWorld->GetGameInstance());
+	if (!DownloaderSubsystem)
+	{
+		//log
+		UE_LOG(LogTemp, Error, TEXT("DownloaderSubsystem is null,you need run the XDownloader at Runtime!!!,if you need editor mode , please contect me by github issuse!!!"));
+		return;
+	}
+	SaveGameSlotName = InSaveGameSlotName.IsEmpty() ? DownloaderSubsystem->GetXDownloadSettings()->GetSaveGameDefaultSlotName() : InSaveGameSlotName;
+	CacheType = DownloaderSubsystem->GetXDownloadSettings()->GetCacheType();
+	DownloaderSaveGame = DownloaderSubsystem->GetSaveGame(SaveGameSlotName);
+	MaxParallelDownloads = DownloaderSubsystem->GetXDownloadSettings()->GetMaxParallelDownloads();
+	MaxRetryTimes = DownloaderSubsystem->GetXDownloadSettings()->GetMaxRetryTimes();
+	CurrentParallelDownloads = 0;
+	DownloadImageDefaultPath = DownloaderSubsystem->GetXDownloadSettings()->GetDownloadImageDefaultPath();
+}
+
+UXDownloadManager* UXDownloadManager::DownloadImages(const TArray<FImageDownloadTask>& Tasks, FString InSaveGameSlotName)
 {
 	GameWorld = GetGameWorld();
 	FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
 	UXDownloadManager* DownloadMgr = NewObject<UXDownloadManager>();
 	DownloadMgr->AddToRoot(); // 防止垃圾回收
 	DownloadMgr->InitTask();
-	DownloadMgr->StartDownload(Tasks);
+	DownloadMgr->InitParas(InSaveGameSlotName);
+	DownloadMgr->ExecuteTask(Tasks);
 	return DownloadMgr;
 }
 
-void UXDownloadManager::StartDownload(const TArray<FImageDownloadTask>& Tasks, int32 MaxDownloads)
+void UXDownloadManager::ExecuteTask(const TArray<FImageDownloadTask>& Tasks, int32 MaxDownloads)
 {
 	//get game instance subsystem
 	if (!IsGameWorldValid())
 	{
 		return;
 	}
-	UXDownloaderSubsystem* DownloaderSubsystem = UGameInstance::GetSubsystem<UXDownloaderSubsystem>(GameWorld->GetGameInstance());
-	DownloaderSaveGame = DownloaderSubsystem->GetSaveGame();
-
-	CurrentParallelDownloads = 0;
-
 	TotalDownloadResult.TotalNum = Tasks.Num();
 	for (auto ImageDownloadTask : Tasks)
 	{
@@ -74,17 +89,36 @@ void UXDownloadManager::OnSubTaskFinished(TSharedPtr<IHttpRequest> HttpRequest, 
 			{
 				const TArray<uint8> Content = Response->GetContent();
 				Result.ImageData = Content;
-				//save to disk
-				const FString FilePath = FPaths::ProjectSavedDir() + TEXT("DownloadImages/") + ImageID + TEXT(".png");
-				FFileHelper::SaveArrayToFile(Content, *FilePath);
 				Result.Status = EDownloadStatus::Success;
-				Result.Texture =FImageUtils::ImportBufferAsTexture2D(Content);
-				FXDownloadImageCached ImageCached;
-				ImageCached.ImageID = ImageID;
-				ImageCached.ImageURL = ImageURL;
-				ImageCached.ImageData = Content;
-				ImageCached.Texture = Result.Texture;
-				DownloaderSaveGame->AddImageCache(ImageCached);
+				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
+				if (CacheType == ECacheType::CT_LocalFile)
+				{
+					//save to disk
+					const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, ImageID + TEXT(".png"));
+					FFileHelper::SaveArrayToFile(Content, *FilePath);
+				}
+				else if (CacheType == ECacheType::CT_SaveGame)
+				{
+					//save to disk
+					FXDownloadImageCached ImageCached;
+					ImageCached.ImageID = ImageID;
+					ImageCached.ImageURL = ImageURL;
+					ImageCached.ImageData = Content;
+					ImageCached.Texture = Result.Texture;
+					DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
+				}
+				else
+				{
+					const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, ImageID + TEXT(".png"));
+					FFileHelper::SaveArrayToFile(Content, *FilePath);
+					//save to disk
+					FXDownloadImageCached ImageCached;
+					ImageCached.ImageID = ImageID;
+					ImageCached.ImageURL = ImageURL;
+					ImageCached.ImageData = Content;
+					ImageCached.Texture = Result.Texture;
+					DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
+				}
 				MakeSubTaskSucceed(Result);
 			}
 			else
@@ -116,7 +150,6 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 				Result.ImageData = Cache->ImageData;
 				Result.Texture = Cache->Texture;
 				MakeSubTaskSucceed(Result);
-				return;
 			}
 		}
 		else

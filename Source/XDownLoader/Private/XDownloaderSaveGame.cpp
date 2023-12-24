@@ -5,13 +5,18 @@
 
 #include "Kismet/GameplayStatics.h"
 
-FString UXDownloaderSaveGame::SlotName = "XDownloaderImagesCahes";
 int32 UXDownloaderSaveGame::UserIndex = 0;
 
-void UXDownloaderSaveGame::AddImageCache(const FXDownloadImageCached& IMageInstance)
+void UXDownloaderSaveGame::SetSlotName(const FString& InSlotName)
 {
+	DefaultSlotName = InSlotName;
+}
+
+void UXDownloaderSaveGame::AddImageCache(const FXDownloadImageCached& IMageInstance, FString NewSlotName)
+{
+	SlotNameOverride = NewSlotName.IsEmpty() ? DefaultSlotName : NewSlotName;
 	ImageCaches.AddUnique(IMageInstance);
-	UGameplayStatics::SaveGameToSlot(this, SlotName, UserIndex);
+	UGameplayStatics::SaveGameToSlot(this, SlotNameOverride, UserIndex);
 }
 
 FXDownloadImageCached* UXDownloaderSaveGame::GetImageCache(const FString& ImageID)
@@ -29,10 +34,15 @@ bool UXDownloaderSaveGame::HasImageCache(const FString& ImageID) const
 	return ImageCaches.Contains(ImageID);
 }
 
-void UXDownloaderSaveGame::ReleaseSaveGame()
+void UXDownloaderSaveGame::ReleaseSaveGame(bool bClearImageCaches)
 {
-	for (FXDownloadImageCached& ImageCach : ImageCaches)
+	for (const FXDownloadImageCached& ImageCached : ImageCaches)
 	{
-		ImageCach.Texture->RemoveFromRoot();
+		ImageCached.Texture->RemoveFromRoot();
+	}
+	if (bClearImageCaches)
+	{
+		ImageCaches.Empty();
+		UGameplayStatics::SaveGameToSlot(this, SlotNameOverride, UserIndex);
 	}
 }

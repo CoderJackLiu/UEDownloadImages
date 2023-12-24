@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "XDownloaderTypes.h"
 #include "UObject/Object.h"
 #include "XDownloaderSettings.generated.h"
 
@@ -12,7 +13,7 @@
  *
  * This class derives from UObject and provides configurable properties for the XDownloader module in project settings.
  */
-UCLASS(Config=Game,defaultconfig)
+UCLASS(Config=Game, defaultconfig)
 class XDOWNLOADER_API UXDownloaderSettings : public UObject
 {
 	GENERATED_BODY()
@@ -26,8 +27,11 @@ protected:
 #endif
 
 public:
+	//获取缓存方式
+	ECacheType GetCacheType() const { return CacheType; }
+
 	//获取SaveGame默认缓存路径
-	FString GetSaveGameDefaultPath() const { return SaveGameDefaultPath.Path; }
+	FString GetSaveGameDefaultSlotName() const { return SaveGameDefaultSlotName; }
 
 	//获取下载图片默认缓存路径
 	FString GetDownloadImageDefaultPath() const { return DownloadImageDefaultPath.Path; }
@@ -42,12 +46,16 @@ public:
 	int32 GetDownloadTimeout() const { return DownloadTimeoutSecond; }
 
 private:
-	//SaveGame默认缓存路径
+	//缓存方式
 	UPROPERTY(Config, EditAnywhere, Category = "XDownloader", meta=(AllowPrivateAccess=true))
-	FDirectoryPath SaveGameDefaultPath;
+	TEnumAsByte<enum ECacheType> CacheType = ECacheType::CT_SaveGame;
+
+	//SaveGame默认缓存路径
+	UPROPERTY(Config, EditAnywhere, Category = "XDownloader", meta=(AllowPrivateAccess=true, EditCondition="CacheType==ECacheType::CT_SaveGame||CacheType==ECacheType::CT_BothSaveGameAndFile", EditConditionHides))
+	FString SaveGameDefaultSlotName;
 
 	//下载图片默认缓存路径
-	UPROPERTY(Config, EditAnywhere, Category = "XDownloader", meta=(AllowPrivateAccess=true))
+	UPROPERTY(Config, EditAnywhere, Category = "XDownloader", meta=(AllowPrivateAccess=true, EditCondition="CacheType==ECacheType::CT_LocalFile||CacheType==ECacheType::CT_BothSaveGameAndFile", EditConditionHides))
 	FDirectoryPath DownloadImageDefaultPath;
 
 	//下载图片的最大并发数

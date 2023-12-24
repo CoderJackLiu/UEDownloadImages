@@ -8,21 +8,13 @@
 UXDownloaderSettings::UXDownloaderSettings()
 {
 	LoadConfig();
-	if (SaveGameDefaultPath.Path.IsEmpty())
+	if (SaveGameDefaultSlotName.IsEmpty())
 	{
-		SaveGameDefaultPath.Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DownloaderSaveGame"));
-	}
-	else
-	{
-		SaveGameDefaultPath.Path = IFileManager::Get().ConvertToRelativePath(*SaveGameDefaultPath.Path);
+		SaveGameDefaultSlotName = TEXT("XDownload/DownloaderSaveGame");
 	}
 	if (DownloadImageDefaultPath.Path.IsEmpty())
 	{
-		DownloadImageDefaultPath.Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("DownloadImages"));
-	}
-	else
-	{
-		DownloadImageDefaultPath.Path = FFileManagerGeneric::DefaultConvertToRelativePath(*DownloadImageDefaultPath.Path);
+		DownloadImageDefaultPath.Path = IFileManager::Get().ConvertToRelativePath(*FPaths::Combine(FPaths::ProjectSavedDir(),TEXT("XDownload/DownloadImages")));
 	}
 }
 
@@ -30,13 +22,13 @@ UXDownloaderSettings::UXDownloaderSettings()
 void UXDownloaderSettings::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	UObject::PostEditChangeProperty(PropertyChangedEvent);
-	if (!SaveGameDefaultPath.Path.IsEmpty())
+	if (SaveGameDefaultSlotName.IsEmpty())
 	{
-		SaveGameDefaultPath.Path = IFileManager::Get().ConvertToRelativePath(*SaveGameDefaultPath.Path);
+		SaveGameDefaultSlotName = TEXT("XDownload/DownloaderSaveGame");
 	}
-	if (!DownloadImageDefaultPath.Path.IsEmpty())
+	if (DownloadImageDefaultPath.Path.IsEmpty())
 	{
-		DownloadImageDefaultPath.Path = FFileManagerGeneric::DefaultConvertToRelativePath(*DownloadImageDefaultPath.Path);
+		DownloadImageDefaultPath.Path = IFileManager::Get().ConvertToRelativePath(*FPaths::Combine(FPaths::ProjectSavedDir(),TEXT("XDownload/DownloadImages")));
 	}
 	SaveConfig();
 }

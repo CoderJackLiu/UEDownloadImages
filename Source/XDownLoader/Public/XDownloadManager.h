@@ -25,6 +25,9 @@ class XDOWNLOADER_API UXDownloadManager : public UBlueprintAsyncActionBase
 {
 	GENERATED_BODY()
 
+private:
+	void InitParas(const FString& InSaveGameSlotName);
+
 public:
 	/**
 	 * @brief This variable is an event dispatcher that will be triggered whenever there is a change in the total download progress.
@@ -62,14 +65,19 @@ public:
 	UPROPERTY(BlueprintAssignable, Category="XDownload")
 	FOnDownloadStatusChanged OnTotalDownloadFailed;
 
+
+	int32 MaxRetryTimes;
+
 	/**
-	 * Downloads images using a given array of download tasks.
+	 * Downloads images from the given tasks and saves them to the specified save game slot.
 	 *
-	 * @param Tasks The array of download tasks containing information about the images to be downloaded.
-	 * @return A pointer to the UXDownloadManager instance which is responsible for handling the image downloads
+	 * @param Tasks The array of image download tasks.
+	 * @param InSaveGameSlotName The name of the save game slot to save the downloaded images.
+	 *
+	 * @return An instance of UXDownloadManager that handles the image download process.
 	 */
 	UFUNCTION(BlueprintCallable, meta = (BlueprintInternalUseOnly = "true", WorldContext = "WorldContextObject"), Category = "XDownload")
-	static UXDownloadManager* DownloadImages(const TArray<FImageDownloadTask>& Tasks);
+	static UXDownloadManager* DownloadImages(const TArray<FImageDownloadTask>& Tasks, FString InSaveGameSlotName = "");
 
 	/**
 	 * @brief Starts the download of image tasks.
@@ -79,8 +87,8 @@ public:
 	 * @param Tasks The array of image download tasks to start.
 	 * @param MaxDownloads The maximum number of concurrent downloads (default value is 3).
 	 */
-	void StartDownload(const TArray<FImageDownloadTask>& Tasks, int32 MaxDownloads = 3);
-	
+	void ExecuteTask(const TArray<FImageDownloadTask>& Tasks, int32 MaxDownloads = 3);
+
 	/**
 	 * Invoked when a sub-task of downloading an image is finished.
 	 *
@@ -149,7 +157,7 @@ public:
 	 * @param Task The download task information, including the image ID and URL.
 	 */
 	void ExecuteDownloadTask(const FImageDownloadTask& Task);
-	
+
 	/**
 	 * @brief Initializes the download task.
 	 *
@@ -172,7 +180,6 @@ public:
 	FTotalDownloadResult TotalDownloadResult;
 
 private:
-	
 	/**
 	 * @brief Destroys the task.
 	 *
@@ -251,7 +258,7 @@ private:
 	 * @param BytesReceived The number of bytes received for the sub-task.
 	 * @param ImageID The ID of the image associated with the sub-task.
 	 */
-	void MakeSubTaskProgress(FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived, FString ImageID) ;
+	void MakeSubTaskProgress(FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived, FString ImageID);
 
 	/**
 	 * @brief The GameWorld variable represents the Unreal Engine world the game is running in.
@@ -330,4 +337,14 @@ private:
 	UPROPERTY(Transient)
 	class UXDownloaderSaveGame* DownloaderSaveGame;
 
+	ECacheType CacheType = ECacheType::CT_SaveGame;
+
+	UPROPERTY(Transient)
+	class UXDownloaderSubsystem* DownloaderSubsystem;
+
+	FString SaveGameSlotName;
+	
+	FString DownloadImageDefaultPath;
+
+	
 };

@@ -5,6 +5,7 @@
 
 #include "XDownloaderSaveGame.h"
 #include "Kismet/GameplayStatics.h"
+#include "XDownloaderSettings.h"
 
 void UXDownloaderSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -16,19 +17,19 @@ void UXDownloaderSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-UXDownloaderSaveGame* UXDownloaderSubsystem::LoadSaveGame()
+UXDownloaderSaveGame* UXDownloaderSubsystem::LoadSaveGame(const FString& InSlotName)
 {
-	if (!UGameplayStatics::DoesSaveGameExist(UXDownloaderSaveGame::SlotName, UXDownloaderSaveGame::UserIndex))
+	if (!UGameplayStatics::DoesSaveGameExist(InSlotName, UXDownloaderSaveGame::UserIndex))
 	{
 		if (USaveGame* SaveGame = UGameplayStatics::CreateSaveGameObject(UXDownloaderSaveGame::StaticClass()))
 		{
-			UGameplayStatics::SaveGameToSlot(SaveGame, UXDownloaderSaveGame::SlotName, UXDownloaderSaveGame::UserIndex);
+			UGameplayStatics::SaveGameToSlot(SaveGame, InSlotName, UXDownloaderSaveGame::UserIndex);
 			return Cast<UXDownloaderSaveGame>(SaveGame);
 		}
 	}
 	else
 	{
-		if (USaveGame* SaveGame = UGameplayStatics::LoadGameFromSlot(UXDownloaderSaveGame::SlotName, UXDownloaderSaveGame::UserIndex))
+		if (USaveGame* SaveGame = UGameplayStatics::LoadGameFromSlot(InSlotName, UXDownloaderSaveGame::UserIndex))
 		{
 			return Cast<UXDownloaderSaveGame>(SaveGame);
 		}
@@ -36,11 +37,11 @@ UXDownloaderSaveGame* UXDownloaderSubsystem::LoadSaveGame()
 	return nullptr;
 }
 
-UXDownloaderSaveGame* UXDownloaderSubsystem::GetSaveGame()
+UXDownloaderSaveGame* UXDownloaderSubsystem::GetSaveGame(const FString& InSlotName)
 {
 	if (!XDownloaderSaveGame)
 	{
-		XDownloaderSaveGame = LoadSaveGame();
+		XDownloaderSaveGame = LoadSaveGame(InSlotName);
 		for (FXDownloadImageCached& ImageCached : XDownloaderSaveGame->ImageCaches)
 		{
 			ImageCached.LoadTextureFromImageData();
@@ -52,7 +53,11 @@ UXDownloaderSaveGame* UXDownloaderSubsystem::GetSaveGame()
 	return XDownloaderSaveGame;
 }
 
-bool UXDownloaderSubsystem::SaveSaveGame()
+UXDownloaderSettings* UXDownloaderSubsystem::GetXDownloadSettings()
 {
-	return UGameplayStatics::SaveGameToSlot(GetSaveGame(), UXDownloaderSaveGame::SlotName, UXDownloaderSaveGame::UserIndex);
+	if (!XDownloaderSettings)
+	{
+		XDownloaderSettings = GetMutableDefault<UXDownloaderSettings>();
+	}
+	return XDownloaderSettings;
 }
