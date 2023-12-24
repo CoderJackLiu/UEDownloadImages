@@ -73,74 +73,75 @@ void UXDownloadManager::ExecuteTask(const TArray<FImageDownloadTask>& Tasks, int
 
 void UXDownloadManager::OnSubTaskFinished(TSharedPtr<IHttpRequest> HttpRequest, TSharedPtr<IHttpResponse> Response, bool bWasSuccessful, FString ImageID, FString ImageURL)
 {
-	AsyncTask(ENamedThreads::GameThread, [this, Response, bWasSuccessful,ImageID,ImageURL]()
+	if (bStopDownload)
 	{
-		if (bStopDownload)
+		bStopDownload = true;
+		return;
+	}
+	FDownloadResult Result;
+	Result.ImageID = ImageID;
+	Result.ImageURL = ImageURL;
+	if (bWasSuccessful)
+	{
+		if (Response.IsValid() && Response->GetContentLength() > 0)
 		{
-			bStopDownload = true;
-			return;
-		}
-		FDownloadResult Result;
-		Result.ImageID = ImageID;
-		Result.ImageURL = ImageURL;
-		if (bWasSuccessful)
-		{
-			if (Response.IsValid() && Response->GetContentLength() > 0)
+			const TArray<uint8> Content = Response->GetContent();
+			Result.ImageData = Content;
+			Result.Status = EDownloadStatus::Success;
+			Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
+			if (CacheType == ECacheType::CT_LocalFile)
 			{
-				const TArray<uint8> Content = Response->GetContent();
-				Result.ImageData = Content;
-				Result.Status = EDownloadStatus::Success;
-				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
-				if (CacheType == ECacheType::CT_LocalFile)
-				{
-					//save to disk
-					const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, ImageID + TEXT(".png"));
-					FFileHelper::SaveArrayToFile(Content, *FilePath);
-				}
-				else if (CacheType == ECacheType::CT_SaveGame)
-				{
-					//save to disk
-					FXDownloadImageCached ImageCached;
-					ImageCached.ImageID = ImageID;
-					ImageCached.ImageURL = ImageURL;
-					ImageCached.ImageData = Content;
-					ImageCached.Texture = Result.Texture;
-					DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
-				}
-				else
-				{
-					const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, ImageID + TEXT(".png"));
-					FFileHelper::SaveArrayToFile(Content, *FilePath);
-					//save to disk
-					FXDownloadImageCached ImageCached;
-					ImageCached.ImageID = ImageID;
-					ImageCached.ImageURL = ImageURL;
-					ImageCached.ImageData = Content;
-					ImageCached.Texture = Result.Texture;
-					DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
-				}
-				MakeSubTaskSucceed(Result);
+				//save to disk
+				const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, ImageID);
+				FFileHelper::SaveArrayToFile(Content, *FilePath);
+			}
+			else if (CacheType == ECacheType::CT_SaveGame)
+			{
+				//save to disk
+				FXDownloadImageCached ImageCached;
+				ImageCached.ImageID = ImageID;
+				ImageCached.ImageURL = ImageURL;
+				ImageCached.ImageData = Content;
+				ImageCached.Texture = Result.Texture;
+				DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
 			}
 			else
 			{
-				Result.Status = EDownloadStatus::Failed;
-				MakeSubTaskError(Result);
+				const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, ImageID);
+				FFileHelper::SaveArrayToFile(Content, *FilePath);
+				//save to disk
+				FXDownloadImageCached ImageCached;
+				ImageCached.ImageID = ImageID;
+				ImageCached.ImageURL = ImageURL;
+				ImageCached.ImageData = Content;
+				ImageCached.Texture = Result.Texture;
+				DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
 			}
+			MakeSubTaskSucceed(Result);
 		}
 		else
 		{
 			Result.Status = EDownloadStatus::Failed;
 			MakeSubTaskError(Result);
 		}
-	});
+	}
+	else
+	{
+		Result.Status = EDownloadStatus::Failed;
+		MakeSubTaskError(Result);
+	}
 }
 
 void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 {
 	AsyncTask(ENamedThreads::BackgroundThreadPriority, [this,Task]()
 	{
-		if (DownloaderSaveGame->HasImageCache(Task.ImageID))
+		bool HasCache = false;
+		const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, Task.ImageID);
+		TArray<uint8> Content;
+		switch (CacheType)
 		{
+		case ECacheType::CT_SaveGame:
 			if (const FXDownloadImageCached* Cache = DownloaderSaveGame->GetImageCache(Task.ImageID))
 			{
 				FDownloadResult Result;
@@ -149,10 +150,84 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 				Result.Status = EDownloadStatus::Failed;
 				Result.ImageData = Cache->ImageData;
 				Result.Texture = Cache->Texture;
+				HasCache = true;
 				MakeSubTaskSucceed(Result);
 			}
+			else
+			{
+				HasCache = false;
+			}
+			break;
+		case ECacheType::CT_LocalFile:
+			if (ImageHasCached(Task.ImageID))
+			{
+				FFileHelper::LoadFileToArray(Content, *FilePath);
+				FDownloadResult Result;
+				Result.ImageID = Task.ImageID;
+				Result.ImageURL = Task.ImageURL;
+				Result.Status = EDownloadStatus::Failed;
+				Result.ImageData = Content;
+				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
+				HasCache = true;
+				MakeSubTaskSucceed(Result);
+			}
+			else
+			{
+				HasCache = false;
+			}
+			break;
+		case ECacheType::CT_BothSaveGameAndFile:
+			if (ImageHasCached(Task.ImageID))
+			{
+				FFileHelper::LoadFileToArray(Content, *FilePath);
+				FDownloadResult Result;
+				Result.ImageID = Task.ImageID;
+				Result.ImageURL = Task.ImageURL;
+				Result.Status = EDownloadStatus::Failed;
+				Result.ImageData = Content;
+				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
+				if (!DownloaderSaveGame->HasImageCache(Task.ImageID))
+				{
+					FXDownloadImageCached ImageCached;
+					ImageCached.ImageID = Task.ImageID;
+					ImageCached.ImageURL = Task.ImageURL;
+					ImageCached.ImageData = Content;
+					ImageCached.Texture = Result.Texture;
+					DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
+				}
+				HasCache = true;
+				MakeSubTaskSucceed(Result);
+			}
+			else if (DownloaderSaveGame->HasImageCache(Task.ImageID))
+			{
+				if (const FXDownloadImageCached* Cache = DownloaderSaveGame->GetImageCache(Task.ImageID))
+				{
+					FDownloadResult Result;
+					Result.ImageID = Task.ImageID;
+					Result.ImageURL = Task.ImageURL;
+					Result.Status = EDownloadStatus::Failed;
+					Result.ImageData = Cache->ImageData;
+					Result.Texture = Cache->Texture;
+					{
+						//image file cache
+						Content = Cache->ImageData;
+						FFileHelper::SaveArrayToFile(Content, *FilePath);
+					}
+					HasCache = true;
+					MakeSubTaskSucceed(Result);
+				}
+				else
+				{
+					HasCache = false;
+				}
+			}
+			else
+			{
+				HasCache = false;
+			}
+			break;
 		}
-		else
+		if (!HasCache)
 		{
 			const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
 			DownLoadRequests.Add(HttpRequest);
@@ -267,6 +342,7 @@ void UXDownloadManager::MakeAllTaskFinished()
 	{
 		AsyncTask(ENamedThreads::GameThread, [this]()
 		{
+			DownloaderSaveGame->SaveImageCacheData();
 			if (DownloadFailNum)
 			{
 				OnTotalDownloadFailed.Broadcast(TotalDownloadResult);
@@ -377,4 +453,12 @@ UTexture2DDynamic* UXDownloadManager::LoadImageFromBuffer(const TArray<uint8>& I
 		}
 	}
 	return nullptr;
+}
+
+bool UXDownloadManager::ImageHasCached(FString FileName)
+{
+	const FString fileFullName = FPaths::Combine(DownloadImageDefaultPath, FileName);
+	//log file full name
+	UE_LOG(LogTemp, Warning, TEXT("ImageHasCached,file name is %s"), *fileFullName);
+	return FPaths::FileExists(fileFullName);
 }

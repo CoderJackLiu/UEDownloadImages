@@ -56,6 +56,8 @@ public:
 	 */
 	void ReleaseSaveGame(bool bClearImageCaches = false);
 
+	void SaveImageCacheData();
+	
 	FString SlotNameOverride;
 	
 	FString DefaultSlotName = "XDownloaderImagesCaches";

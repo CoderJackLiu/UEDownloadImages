@@ -16,7 +16,6 @@ void UXDownloaderSaveGame::AddImageCache(const FXDownloadImageCached& IMageInsta
 {
 	SlotNameOverride = NewSlotName.IsEmpty() ? DefaultSlotName : NewSlotName;
 	ImageCaches.AddUnique(IMageInstance);
-	UGameplayStatics::SaveGameToSlot(this, SlotNameOverride, UserIndex);
 }
 
 FXDownloadImageCached* UXDownloaderSaveGame::GetImageCache(const FString& ImageID)
@@ -26,11 +25,6 @@ FXDownloadImageCached* UXDownloaderSaveGame::GetImageCache(const FString& ImageI
 
 bool UXDownloaderSaveGame::HasImageCache(const FString& ImageID) const
 {
-	TArray<FXDownloadImageCached> LocalImageCaches = ImageCaches;
-	for (FXDownloadImageCached& ImageCached : LocalImageCaches)
-	{
-		UE_LOG(LogTemp, Error, TEXT("ImageCach.ImageID: %s"), *ImageCached.ImageID);
-	}
 	return ImageCaches.Contains(ImageID);
 }
 
@@ -45,4 +39,9 @@ void UXDownloaderSaveGame::ReleaseSaveGame(bool bClearImageCaches)
 		ImageCaches.Empty();
 		UGameplayStatics::SaveGameToSlot(this, SlotNameOverride, UserIndex);
 	}
+}
+
+void UXDownloaderSaveGame::SaveImageCacheData()
+{
+	UGameplayStatics::SaveGameToSlot(this, SlotNameOverride, UserIndex);
 }

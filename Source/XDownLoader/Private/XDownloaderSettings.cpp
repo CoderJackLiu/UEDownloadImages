@@ -30,6 +30,10 @@ void UXDownloaderSettings::PostEditChangeProperty(FPropertyChangedEvent& Propert
 	{
 		DownloadImageDefaultPath.Path = IFileManager::Get().ConvertToRelativePath(*FPaths::Combine(FPaths::ProjectSavedDir(),TEXT("XDownload/DownloadImages")));
 	}
+	else
+	{
+		DownloadImageDefaultPath.Path = IFileManager::Get().ConvertToRelativePath(*DownloadImageDefaultPath.Path);
+	}
 	SaveConfig();
 }
 #endif

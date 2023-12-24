@@ -346,5 +346,7 @@ private:
 	
 	FString DownloadImageDefaultPath;
 
+
+	bool ImageHasCached(FString FileName);
 	
 };
