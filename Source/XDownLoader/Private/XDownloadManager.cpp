@@ -3,6 +3,7 @@
 #include "HttpModule.h"
 #include "IImageWrapper.h"
 #include "IImageWrapperModule.h"
+#include "ImageUtils.h"
 #include "XDownloaderSaveGame.h"
 #include "XDownloaderSubsystem.h"
 #include "Engine/Texture2DDynamic.h"
@@ -77,11 +78,12 @@ void UXDownloadManager::OnSubTaskFinished(TSharedPtr<IHttpRequest> HttpRequest, 
 				const FString FilePath = FPaths::ProjectSavedDir() + TEXT("DownloadImages/") + ImageID + TEXT(".png");
 				FFileHelper::SaveArrayToFile(Content, *FilePath);
 				Result.Status = EDownloadStatus::Success;
-
+				Result.Texture =FImageUtils::ImportBufferAsTexture2D(Content);
 				FXDownloadImageCached ImageCached;
 				ImageCached.ImageID = ImageID;
 				ImageCached.ImageURL = ImageURL;
 				ImageCached.ImageData = Content;
+				ImageCached.Texture = Result.Texture;
 				DownloaderSaveGame->AddImageCache(ImageCached);
 				MakeSubTaskSucceed(Result);
 			}
