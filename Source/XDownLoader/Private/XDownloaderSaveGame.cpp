@@ -43,5 +43,5 @@ void UXDownloaderSaveGame::ReleaseSaveGame(bool bClearImageCaches)
 
 void UXDownloaderSaveGame::SaveImageCacheData()
 {
-	UGameplayStatics::SaveGameToSlot(this, SlotNameOverride, UserIndex);
+	UGameplayStatics::AsyncSaveGameToSlot(this, SlotNameOverride, UserIndex);
 }
