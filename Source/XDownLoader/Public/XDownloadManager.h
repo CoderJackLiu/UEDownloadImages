@@ -68,6 +68,8 @@ public:
 
 	int32 MaxRetryTimes;
 
+	float DownloadTimeoutSecond;
+
 	/**
 	 * Downloads images from the given tasks and saves them to the specified save game slot.
 	 *
@@ -348,5 +350,8 @@ private:
 
 
 	bool ImageHasCached(FString FileName);
+
+	//download image
+	void DownloadImage(const FString& ImageURL, const FString& ImageID);
 	
 };

@@ -31,6 +31,7 @@ void UXDownloadManager::InitParas(const FString& InSaveGameSlotName)
 	DownloaderSaveGame = DownloaderSubsystem->GetSaveGame(SaveGameSlotName);
 	MaxParallelDownloads = DownloaderSubsystem->GetXDownloadSettings()->GetMaxParallelDownloads();
 	MaxRetryTimes = DownloaderSubsystem->GetXDownloadSettings()->GetMaxRetryTimes();
+	DownloadTimeoutSecond = DownloaderSubsystem->GetXDownloadSettings()->GetDownloadTimeout();
 	CurrentParallelDownloads = 0;
 	DownloadImageDefaultPath = DownloaderSubsystem->GetXDownloadSettings()->GetDownloadImageDefaultPath();
 }
@@ -147,7 +148,7 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 				FDownloadResult Result;
 				Result.ImageID = Task.ImageID;
 				Result.ImageURL = Task.ImageURL;
-				Result.Status = EDownloadStatus::Failed;
+				Result.Status = EDownloadStatus::Success;
 				Result.ImageData = Cache->ImageData;
 				Result.Texture = Cache->Texture;
 				HasCache = true;
@@ -165,7 +166,7 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 				FDownloadResult Result;
 				Result.ImageID = Task.ImageID;
 				Result.ImageURL = Task.ImageURL;
-				Result.Status = EDownloadStatus::Failed;
+				Result.Status = EDownloadStatus::Success;
 				Result.ImageData = Content;
 				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
 				HasCache = true;
@@ -183,7 +184,7 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 				FDownloadResult Result;
 				Result.ImageID = Task.ImageID;
 				Result.ImageURL = Task.ImageURL;
-				Result.Status = EDownloadStatus::Failed;
+				Result.Status = EDownloadStatus::Success;
 				Result.ImageData = Content;
 				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
 				if (!DownloaderSaveGame->HasImageCache(Task.ImageID))
@@ -205,7 +206,7 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 					FDownloadResult Result;
 					Result.ImageID = Task.ImageID;
 					Result.ImageURL = Task.ImageURL;
-					Result.Status = EDownloadStatus::Failed;
+					Result.Status = EDownloadStatus::Success;
 					Result.ImageData = Cache->ImageData;
 					Result.Texture = Cache->Texture;
 					{
@@ -229,15 +230,7 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 		}
 		if (!HasCache)
 		{
-			const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
-			DownLoadRequests.Add(HttpRequest);
-			HttpRequest->SetURL(Task.ImageURL);
-			HttpRequest->SetVerb(TEXT("GET"));
-			HttpRequest->OnRequestProgress().BindUObject(this, &UXDownloadManager::MakeSubTaskProgress, Task.ImageID);
-			HttpRequest->OnProcessRequestComplete().BindUObject(this, &UXDownloadManager::OnSubTaskFinished, Task.ImageID, Task.ImageURL);
-			HttpRequest->SetHeader("ImageID", Task.ImageID);
-			HttpRequest->SetHeader("ImageURL", Task.ImageURL);
-			HttpRequest->ProcessRequest();
+			DownloadImage(Task.ImageURL, Task.ImageID);
 		}
 	});
 }
@@ -461,4 +454,18 @@ bool UXDownloadManager::ImageHasCached(FString FileName)
 	//log file full name
 	UE_LOG(LogTemp, Warning, TEXT("ImageHasCached,file name is %s"), *fileFullName);
 	return FPaths::FileExists(fileFullName);
+}
+
+void UXDownloadManager::DownloadImage(const FString& ImageURL, const FString& ImageID)
+{
+	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
+	DownLoadRequests.Add(HttpRequest);
+	HttpRequest->SetURL(ImageURL);
+	HttpRequest->SetTimeout(DownloadTimeoutSecond);
+	HttpRequest->SetVerb(TEXT("GET"));
+	HttpRequest->OnRequestProgress().BindUObject(this, &UXDownloadManager::MakeSubTaskProgress, ImageID);
+	HttpRequest->OnProcessRequestComplete().BindUObject(this, &UXDownloadManager::OnSubTaskFinished, ImageID, ImageURL);
+	HttpRequest->SetHeader("ImageID", ImageID);
+	HttpRequest->SetHeader("ImageURL", ImageURL);
+	HttpRequest->ProcessRequest();
 }
