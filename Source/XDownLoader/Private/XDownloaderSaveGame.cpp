@@ -21,14 +21,7 @@ void UXDownloaderSaveGame::AddImageCache(const FXDownloadImageCached& IMageInsta
 
 FXDownloadImageCached* UXDownloaderSaveGame::GetImageCache(const FString& ImageID)
 {
-	// FScopeLock Lock(&ImportBufferLock);
-	FXDownloadImageCached* Cached = ImageCaches.FindByKey(ImageID);
-	if (Cached->Texture == nullptr)
-	{
-		Cached->Texture = FImageUtils::ImportBufferAsTexture2D(Cached->ImageData);
-		Cached->Texture->AddToRoot();
-	}
-	return Cached;
+	return ImageCaches.FindByKey(ImageID);
 }
 
 bool UXDownloaderSaveGame::HasImageCache(const FString& ImageID) const

@@ -55,6 +55,13 @@ UXDownloaderSaveGame* UXDownloaderSubsystem::GetSaveGame(const FString& InSlotNa
 	if (!XDownloaderSaveGame)
 	{
 		XDownloaderSaveGame = LoadSaveGame(InSlotName);
+		for (FXDownloadImageCached& ImageCached : XDownloaderSaveGame->ImageCaches)
+		{
+			ImageCached.LoadTextureFromImageData();
+			ImageCached.Texture->AddToRoot();
+			//log ImageCached.Texture->GetName();
+			UE_LOG(LogTemp, Error, TEXT("ImageCached.Texture->GetName(): %s"), *ImageCached.Texture->GetName());
+		}
 		XDownloaderSaveGames.Add(XDownloaderSaveGame);
 	}
 	return XDownloaderSaveGame;
