@@ -3,6 +3,7 @@
 
 #include "XDownloaderSaveGame.h"
 
+#include "ImageUtils.h"
 #include "Kismet/GameplayStatics.h"
 
 int32 UXDownloaderSaveGame::UserIndex = 0;
@@ -20,7 +21,14 @@ void UXDownloaderSaveGame::AddImageCache(const FXDownloadImageCached& IMageInsta
 
 FXDownloadImageCached* UXDownloaderSaveGame::GetImageCache(const FString& ImageID)
 {
-	return ImageCaches.FindByKey(ImageID);
+	// FScopeLock Lock(&ImportBufferLock);
+	FXDownloadImageCached* Cached = ImageCaches.FindByKey(ImageID);
+	if (Cached->Texture == nullptr)
+	{
+		Cached->Texture = FImageUtils::ImportBufferAsTexture2D(Cached->ImageData);
+		Cached->Texture->AddToRoot();
+	}
+	return Cached;
 }
 
 bool UXDownloaderSaveGame::HasImageCache(const FString& ImageID) const

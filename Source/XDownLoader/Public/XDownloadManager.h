@@ -135,6 +135,14 @@ public:
 	static TQueue<FImageDownloadTask> TaskQueue;
 
 	/**
+	 * @brief The number of currently downloading tasks.
+	 *
+	 * This variable is used to keep track of the number of tasks currently being downloaded by the XDownloadManager.
+	 * It is initialized to 0 and gets incremented or decremented based on the tasks being added or completed.
+	 */
+	int32 CurrentTaskDownloadingNum = 0;
+
+	/**
 	 * @brief DownloadFailNum
 	 *
 	 * Variable to keep track of the number of download failures.
@@ -180,6 +188,9 @@ public:
 	 * @note This structure should be used after a total download has been completed.
 	 */
 	FTotalDownloadResult TotalDownloadResult;
+
+
+	TArray<FImageDownloadTask> CurrentTasks;
 
 private:
 	/**
@@ -344,8 +355,10 @@ private:
 	UPROPERTY(Transient)
 	class UXDownloaderSubsystem* DownloaderSubsystem;
 
-	FString SaveGameSlotName;
+	static TArray<UXDownloadManager*> DownloadManagers;
 	
+	FString SaveGameSlotName;
+
 	FString DownloadImageDefaultPath;
 
 
@@ -353,5 +366,11 @@ private:
 
 	//download image
 	void DownloadImage(const FString& ImageURL, const FString& ImageID);
+
+
+	//execute next task
+	static void ExecuteNextTask();
+
+
 	
 };

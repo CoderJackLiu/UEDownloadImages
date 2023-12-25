@@ -63,6 +63,8 @@ public:
 	FString DefaultSlotName = "XDownloaderImagesCaches";
 	
 	static int32 UserIndex;
+	
+	FCriticalSection ImportBufferLock;
 
 private:
 	//UXDownloaderSaveGame* XDownloaderSaveGame;

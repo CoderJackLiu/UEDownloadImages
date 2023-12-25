@@ -61,8 +61,7 @@ private:
 	 * This struct represents the cached data for a downloaded image.
 	 */
 	UPROPERTY(BlueprintReadOnly, Category="XDownloader", meta=(AllowPrivateAccess=true))
-	UXDownloaderSaveGame* XDownloaderSaveGame;
-
+	TArray<USaveGame*> XDownloaderSaveGames;
 
 	/**
 	 * @class XDownloaderSettings
@@ -72,4 +71,6 @@ private:
 	 */
 	UPROPERTY(BlueprintReadOnly, Category="XDownloader", meta=(AllowPrivateAccess=true))
 	UXDownloaderSettings* XDownloaderSettings;
+
+	UXDownloaderSaveGame* FindOrLoadSaveGame(const FString& InSlotName);
 };

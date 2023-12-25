@@ -16,6 +16,7 @@ int32 UXDownloadManager::CurrentParallelDownloads = 0;
 static FCriticalSection ExecutingXDownloadTaskPoolLock;
 TQueue<FImageDownloadTask> UXDownloadManager::TaskQueue;
 UWorld* UXDownloadManager::GameWorld = nullptr;
+TArray<UXDownloadManager*> UXDownloadManager::DownloadManagers;
 
 void UXDownloadManager::InitParas(const FString& InSaveGameSlotName)
 {
@@ -32,7 +33,6 @@ void UXDownloadManager::InitParas(const FString& InSaveGameSlotName)
 	MaxParallelDownloads = DownloaderSubsystem->GetXDownloadSettings()->GetMaxParallelDownloads();
 	MaxRetryTimes = DownloaderSubsystem->GetXDownloadSettings()->GetMaxRetryTimes();
 	DownloadTimeoutSecond = DownloaderSubsystem->GetXDownloadSettings()->GetDownloadTimeout();
-	CurrentParallelDownloads = 0;
 	DownloadImageDefaultPath = DownloaderSubsystem->GetXDownloadSettings()->GetDownloadImageDefaultPath();
 }
 
@@ -42,6 +42,7 @@ UXDownloadManager* UXDownloadManager::DownloadImages(const TArray<FImageDownload
 	FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
 	UXDownloadManager* DownloadMgr = NewObject<UXDownloadManager>();
 	DownloadMgr->AddToRoot(); // 防止垃圾回收
+	DownloadManagers.Add(DownloadMgr);
 	DownloadMgr->InitTask();
 	DownloadMgr->InitParas(InSaveGameSlotName);
 	DownloadMgr->ExecuteTask(Tasks);
@@ -56,18 +57,25 @@ void UXDownloadManager::ExecuteTask(const TArray<FImageDownloadTask>& Tasks, int
 		return;
 	}
 	TotalDownloadResult.TotalNum = Tasks.Num();
+	CurrentTasks = Tasks;
+	// FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
 	for (auto ImageDownloadTask : Tasks)
 	{
 		TaskQueue.Enqueue(ImageDownloadTask);
 	}
-	const int32 CanDownloadNum = FMath::Min(FMath::Min(MaxParallelDownloads - CurrentParallelDownloads, Tasks.Num()), MaxDownloads);
+	// const int32 CanDownloadNum = FMath::Min(FMath::Min(MaxParallelDownloads - CurrentParallelDownloads, Tasks.Num()), MaxDownloads);
+	int32 CanDownloadNum = FMath::Min(MaxParallelDownloads - CurrentParallelDownloads, Tasks.Num());
 	for (int i = 0; i < CanDownloadNum; ++i)
 	{
 		FImageDownloadTask Task;
 		if (TaskQueue.Dequeue(Task))
 		{
-			FPlatformAtomics::InterlockedIncrement(&CurrentParallelDownloads);
-			ExecuteDownloadTask(Task);
+			if (const FImageDownloadTask* FinishItem = CurrentTasks.FindByKey(Task.ImageID))
+			{
+				const FImageDownloadTask RemoveItem = *FinishItem;
+				CurrentTasks.Remove(RemoveItem);
+				ExecuteDownloadTask(Task);
+			}
 		}
 	}
 }
@@ -135,73 +143,76 @@ void UXDownloadManager::OnSubTaskFinished(TSharedPtr<IHttpRequest> HttpRequest, 
 
 void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 {
+	FPlatformAtomics::InterlockedIncrement(&CurrentTaskDownloadingNum);
+	FPlatformAtomics::InterlockedIncrement(&CurrentParallelDownloads);
 	AsyncTask(ENamedThreads::BackgroundThreadPriority, [this,Task]()
 	{
-		bool HasCache = false;
 		const FString FilePath = FPaths::Combine(DownloadImageDefaultPath, Task.ImageID);
 		TArray<uint8> Content;
-		switch (CacheType)
+		FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
 		{
-		case ECacheType::CT_SaveGame:
-			if (const FXDownloadImageCached* Cache = DownloaderSaveGame->GetImageCache(Task.ImageID))
+			bool HasCache = false;
+			switch (CacheType)
 			{
-				FDownloadResult Result;
-				Result.ImageID = Task.ImageID;
-				Result.ImageURL = Task.ImageURL;
-				Result.Status = EDownloadStatus::Success;
-				Result.ImageData = Cache->ImageData;
-				Result.Texture = Cache->Texture;
-				HasCache = true;
-				MakeSubTaskSucceed(Result);
-			}
-			else
-			{
-				HasCache = false;
-			}
-			break;
-		case ECacheType::CT_LocalFile:
-			if (ImageHasCached(Task.ImageID))
-			{
-				FFileHelper::LoadFileToArray(Content, *FilePath);
-				FDownloadResult Result;
-				Result.ImageID = Task.ImageID;
-				Result.ImageURL = Task.ImageURL;
-				Result.Status = EDownloadStatus::Success;
-				Result.ImageData = Content;
-				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
-				HasCache = true;
-				MakeSubTaskSucceed(Result);
-			}
-			else
-			{
-				HasCache = false;
-			}
-			break;
-		case ECacheType::CT_BothSaveGameAndFile:
-			if (ImageHasCached(Task.ImageID))
-			{
-				FFileHelper::LoadFileToArray(Content, *FilePath);
-				FDownloadResult Result;
-				Result.ImageID = Task.ImageID;
-				Result.ImageURL = Task.ImageURL;
-				Result.Status = EDownloadStatus::Success;
-				Result.ImageData = Content;
-				Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
-				if (!DownloaderSaveGame->HasImageCache(Task.ImageID))
-				{
-					FXDownloadImageCached ImageCached;
-					ImageCached.ImageID = Task.ImageID;
-					ImageCached.ImageURL = Task.ImageURL;
-					ImageCached.ImageData = Content;
-					ImageCached.Texture = Result.Texture;
-					DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
-				}
-				HasCache = true;
-				MakeSubTaskSucceed(Result);
-			}
-			else if (DownloaderSaveGame->HasImageCache(Task.ImageID))
-			{
+			case ECacheType::CT_SaveGame:
+
 				if (const FXDownloadImageCached* Cache = DownloaderSaveGame->GetImageCache(Task.ImageID))
+				{
+					FDownloadResult Result;
+					Result.ImageID = Task.ImageID;
+					Result.ImageURL = Task.ImageURL;
+					Result.Status = EDownloadStatus::Success;
+					Result.ImageData = Cache->ImageData;
+					Result.Texture = Cache->Texture;
+					HasCache = true;
+					MakeSubTaskSucceed(Result);
+				}
+				else
+				{
+					HasCache = false;
+				}
+				break;
+			case ECacheType::CT_LocalFile:
+				if (ImageHasCached(Task.ImageID))
+				{
+					FFileHelper::LoadFileToArray(Content, *FilePath);
+					FDownloadResult Result;
+					Result.ImageID = Task.ImageID;
+					Result.ImageURL = Task.ImageURL;
+					Result.Status = EDownloadStatus::Success;
+					Result.ImageData = Content;
+					Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
+					HasCache = true;
+					MakeSubTaskSucceed(Result);
+				}
+				else
+				{
+					HasCache = false;
+				}
+				break;
+			case ECacheType::CT_BothSaveGameAndFile:
+				if (ImageHasCached(Task.ImageID))
+				{
+					FFileHelper::LoadFileToArray(Content, *FilePath);
+					FDownloadResult Result;
+					Result.ImageID = Task.ImageID;
+					Result.ImageURL = Task.ImageURL;
+					Result.Status = EDownloadStatus::Success;
+					Result.ImageData = Content;
+					Result.Texture = FImageUtils::ImportBufferAsTexture2D(Content);
+					if (!DownloaderSaveGame->HasImageCache(Task.ImageID))
+					{
+						FXDownloadImageCached ImageCached;
+						ImageCached.ImageID = Task.ImageID;
+						ImageCached.ImageURL = Task.ImageURL;
+						ImageCached.ImageData = Content;
+						ImageCached.Texture = Result.Texture;
+						DownloaderSaveGame->AddImageCache(ImageCached, SaveGameSlotName);
+					}
+					HasCache = true;
+					MakeSubTaskSucceed(Result);
+				}
+				else if (const FXDownloadImageCached* Cache = DownloaderSaveGame->GetImageCache(Task.ImageID))
 				{
 					FDownloadResult Result;
 					Result.ImageID = Task.ImageID;
@@ -221,16 +232,12 @@ void UXDownloadManager::ExecuteDownloadTask(const FImageDownloadTask& Task)
 				{
 					HasCache = false;
 				}
+				break;
 			}
-			else
+			if (!HasCache)
 			{
-				HasCache = false;
+				DownloadImage(Task.ImageURL, Task.ImageID);
 			}
-			break;
-		}
-		if (!HasCache)
-		{
-			DownloadImage(Task.ImageURL, Task.ImageID);
 		}
 	});
 }
@@ -241,14 +248,12 @@ void UXDownloadManager::InitTask()
 	OnTotalDownloadFailed.Clear();
 	OnTotalDownloadProgress.Clear();
 	TaskQueue.Empty();
-	CurrentParallelDownloads = 0;
 	DownloadFailNum = 0;
 	TotalDownloadResult = FTotalDownloadResult();
 }
 
 void UXDownloadManager::DestroyTask()
 {
-	InitTask();
 	for (const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> DownLoadRequest : DownLoadRequests)
 	{
 		DownLoadRequest->OnProcessRequestComplete().Unbind();
@@ -257,7 +262,7 @@ void UXDownloadManager::DestroyTask()
 		UE_LOG(LogTemp, Warning, TEXT("DownloadManager http request unbind  url is  %s !!!!"), *DownLoadRequest->GetURL());
 	}
 	DownLoadRequests.Empty();
-	GameWorld = nullptr;
+	DownloadManagers.Remove(this);
 	UE_LOG(LogTemp, Warning, TEXT("DownloadManager Destroy!!!"));
 	RemoveFromRoot();
 }
@@ -267,6 +272,8 @@ void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 	FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
 	{
 		FPlatformAtomics::InterlockedDecrement(&CurrentParallelDownloads);
+		FPlatformAtomics::InterlockedDecrement(&CurrentTaskDownloadingNum);
+		//log succeed
 		UE_LOG(LogTemp, Warning, TEXT("Download Succeed!!! ImageID :%s ,URL:%s"), * InTaskResult.ImageID, *InTaskResult.ImageURL);
 		UpdateAllProgress();
 		TotalDownloadResult.SubTaskDownloadResults.Add(InTaskResult);
@@ -276,18 +283,16 @@ void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 			DestroyTask();
 			return;
 		}
-		if (CurrentParallelDownloads == 0)
+		if (CurrentTasks.Num() == 0)
 		{
-			MakeAllTaskFinished();
+			if (CurrentTaskDownloadingNum == 0)
+			{
+				MakeAllTaskFinished();
+			}
 		}
 		else
 		{
-			FImageDownloadTask Task;
-			if (TaskQueue.Dequeue(Task))
-			{
-				FPlatformAtomics::InterlockedIncrement(&CurrentParallelDownloads);
-				ExecuteDownloadTask(Task);
-			}
+			ExecuteNextTask();
 		}
 	}
 }
@@ -300,22 +305,22 @@ void UXDownloadManager::MakeSubTaskError(const FDownloadResult& InTaskResult)
 		UE_LOG(LogTemp, Error, TEXT("Download failed!!!"));
 		FPlatformAtomics::InterlockedIncrement(&DownloadFailNum);
 		FPlatformAtomics::InterlockedDecrement(&CurrentParallelDownloads);
+		FPlatformAtomics::InterlockedDecrement(&CurrentTaskDownloadingNum);
 		TotalDownloadResult.SubTaskDownloadResults.Add(InTaskResult);
+		UpdateAllProgress();
 		//log error  log InTaskResult.ImageID
 		UE_LOG(LogTemp, Error, TEXT("Download failed!!! ImageID :%s ,URL:%s"), * InTaskResult.ImageID, *InTaskResult.ImageURL);
 
-		if (CurrentParallelDownloads == 0)
+		if (CurrentTasks.Num() == 0)
 		{
-			MakeAllTaskFinished();
+			if (CurrentTaskDownloadingNum == 0)
+			{
+				MakeAllTaskFinished();
+			}
 		}
 		else
 		{
-			UpdateAllProgress();
-			FImageDownloadTask Task;
-			if (TaskQueue.Dequeue(Task))
-			{
-				ExecuteDownloadTask(Task);
-			}
+			ExecuteNextTask();
 		}
 	}
 }
@@ -351,6 +356,7 @@ void UXDownloadManager::MakeAllTaskFinished()
 			DestroyTask();
 		});
 	}
+	ExecuteNextTask();
 }
 
 void UXDownloadManager::MakeSubTaskProgress(FHttpRequestPtr Request, int32 BytesSent, int32 BytesReceived, FString ImageID)
@@ -459,7 +465,10 @@ bool UXDownloadManager::ImageHasCached(FString FileName)
 void UXDownloadManager::DownloadImage(const FString& ImageURL, const FString& ImageID)
 {
 	const TSharedRef<IHttpRequest, ESPMode::ThreadSafe> HttpRequest = FHttpModule::Get().CreateRequest();
-	DownLoadRequests.Add(HttpRequest);
+	FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
+	{
+		DownLoadRequests.Add(HttpRequest);
+	}
 	HttpRequest->SetURL(ImageURL);
 	HttpRequest->SetTimeout(DownloadTimeoutSecond);
 	HttpRequest->SetVerb(TEXT("GET"));
@@ -468,4 +477,39 @@ void UXDownloadManager::DownloadImage(const FString& ImageURL, const FString& Im
 	HttpRequest->SetHeader("ImageID", ImageID);
 	HttpRequest->SetHeader("ImageURL", ImageURL);
 	HttpRequest->ProcessRequest();
+}
+
+void UXDownloadManager::ExecuteNextTask()
+{
+	FImageDownloadTask Task;
+	if (TaskQueue.Peek(Task))
+	{
+		for (UXDownloadManager* DownloadManager : DownloadManagers)
+		{
+			if (const FImageDownloadTask* FinishItem = DownloadManager->CurrentTasks.FindByKey(Task.ImageID))
+			{
+				const FImageDownloadTask RemoveItem = *FinishItem;
+				if (DownloadManager->CurrentTasks.Remove(RemoveItem))
+				{
+					if (!TaskQueue.Dequeue(Task))
+					{
+						//log error dequeue failed but alone task object not finish 
+						UE_LOG(LogTemp, Error, TEXT("dequeue failed but alone task object not finish!!!"));
+					}
+					DownloadManager->ExecuteDownloadTask(Task);
+				}
+				return;
+			}
+			else
+			{
+				//log this task does not contains this sub task
+				UE_LOG(LogTemp, Warning, TEXT("this task does not contains this sub task!!!"));
+			}
+		}
+	}
+	else
+	{
+		//log alone task object not finish but queue is empty
+		UE_LOG(LogTemp, Error, TEXT("alone task object not finish but queue is empty!!!"));
+	}
 }
