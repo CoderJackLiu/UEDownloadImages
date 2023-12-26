@@ -1,65 +1,88 @@
 # UEDownloadImages
-UE5 Download Images plugin. for cache and multi download images instead of download image blueprint API from unreal engin.
 
+## Background and Problem Solved
 
+This plugin addresses a specific issue in Unreal Engine: the `DownloadImage` node cannot be directly called multiple times in a loop, and subsequent calls overwrite previous results. Additionally, this node lacks caching functionality.
 
-## Introduction
-This plugin is designed to address the limitations of Unreal Engine's native single-image download capability. The built-in `downloadImage` API only supports downloading one image at a time and struggles with multiple images, often resulting in the latter overwriting the former. Moreover, this API lacks a caching feature. Our plugin overcomes these issues by offering the `DownloadImages` API and image caching.
+Although real-time downloading is common in game development, this plugin is crucial for scenarios requiring caching, or simultaneous downloading of multiple images followed by additional processing. It's an ideal choice for any Unreal Engine application aiming to enhance user experience through caching.
+
+The plugin significantly saves time by eliminating complex programming required for implementing parallel downloading and caching functionalities.
 
 ## Features
-- **Multiple Image Download**: The `DownloadImages` API allows users to download multiple images simultaneously. This requires an array of structures composed of image IDs and URLs.
-- **Image Caching**: Utilizes Unreal Engine's `SaveGame` for image caching. The same image ID will not be downloaded repeatedly. Note that if the server-side image ID is updated, the corresponding URL should also be updated.
-- **Customizability**: The plugin supports customized settings, such as the default location for caching images.
-- **Multiple Caching Modes**: Users can choose to cache using the `SaveGame` method, cache local files, or use both methods simultaneously.
 
-![ProjectSettings](Resources/Settings.png)
-![DownloadImages](Resources/Node.png)
-![Demo](Resources/Demo.png)
+- **Extension**: Solves the issue of overlapping results due to the inability to call the `DownloadImage` node multiple times in a loop.
+- **Multiple Image Downloading**: The `DownloadImages` API allows users to download multiple images simultaneously, requiring an array of structures composed of image IDs and URLs.
+- **Caching**: Implements image caching using Unreal Engine's `SaveGame` feature, preventing repeated downloads for the same image ID.
+- **Customizable Settings**: Supports customized settings, such as default location for cached images, maximum number of parallel downloads, and caching methods.
+- **Caching Methods**: Offers options to cache using `SaveGame`, local file caching, or both.
+- **Simplicity**: Enables multiple image downloads with just a call to the `DownloadImages` blueprint node, no complex code required.
+
+## Prerequisites
+
+- Developed using Unreal Engine 5.3, ensure your project uses Unreal Engine version 5.3 or higher.
+- **Note**: It is recommended to use the image's URL or the filename from the URL as the image ID for uniqueness and updateability.
 
 ## Compatibility
-- Developed using Unreal Engine 5.1, this plugin should be easily adaptable to Unreal Engine 4 and higher versions of Unreal Engine 5. Developers interested in contributing can add branches for other versions.
+
+- Developed with Unreal Engine 5.3 and uses stable APIs common in Unreal, making it adaptable for Unreal 4 and higher versions of Unreal 5. Developers interested in supporting other versions are welcome to contribute.
 
 ## Example
-- Open the `UEDownloadImagesExample` map located in the Content directory of the plugin. Run the game, and click to execute to see the effect. For specific usage, please refer to the BP_UEDownloadImagesController under GameMode.
+
+- Open the `UEDownloadImagesExample` map in the plugin's `Content` directory, run the game, and click to see the effects. For specific calls, refer to `BP_UEDownloadImagesController` under `GameMode`.
 
 ## Feedback and Suggestions
-- For additional feature requests or suggestions, feel free to leave a message in the issues section.
+
+- For additional feature requests or suggestions, please discuss in the issues section.
 
 ## Future Updates
-- **Single Image Download and Caching**: We will add a `DownloadImageWithCache` API for downloading a single image with support for automatic caching or cache retrieval.
-- **Enhanced Project Settings**: More options for project settings will be provided to enhance user customization.
 
-## Use Cases
-While not common in game development, this plugin can quickly address specific needs, especially suitable for scenarios requiring the download and management of multiple images.
+- **Method Parameter Updates**: Add parameters in the `DownloadImages` method for whether to cache and the caching method, allowing real-time overrides of project settings.
 
-# 虚幻引擎图片下载插件
+## Application Scenarios
 
-## 简介
-本插件旨在解决虚幻引擎仅提供单一图片下载的局限性。虚幻引擎内置的 `downloadImage` API只能同时下载一个图片，且存在多图下载时后续图片会覆盖前者的问题。此外，该API不支持图片缓存功能。本插件通过提供 `DownloadImages` API和图片缓存功能，克服了这些限制。
+While not common in game development, this plugin quickly solves specific needs, particularly suitable for scenarios requiring downloading and managing multiple images.
+
+# 背景和解决的问题
+
+本插件针对虚幻引擎中的一个具体问题：`DownloadImage`节点无法在循环中被多次直接调用，且后续调用会覆盖之前的结果。此外，该节点也不支持缓存功能。
+
+在游戏开发领域，虽然通常采取实时下载方式，但对于需要缓存的场景，或同时下载多张图片并在下载完成后执行其他操作的场景，本插件非常关键。对于任何希望通过缓存提升用户体验的虚幻引擎应用，这个插件也是一个理想选择。
+
+本插件可以显著节省时间，免去实现并行下载和缓存功能的复杂编程工作。
 
 ## 功能
-- **多图下载**: `DownloadImages` API允许用户同时下载多张图片，需输入图片ID和URL组成的结构体数组。
-- **图片缓存**: 利用虚幻引擎的 `SaveGame` 实现图片缓存，同一图片ID不会重复下载。请注意，若服务端对应的图片ID更新，则URL也应相应更新。
-- **定制性**: 插件支持定制化设置，例如缓存图片的默认位置。
-- **多模式**：可以选择使用saveGame的方式缓存，也可以使用缓存本地文件的方式缓存，也可以两个同时缓存；
+
+- **扩展**: 解决了`DownloadImage`节点在循环中无法多次调用导致的调用结果相互覆盖问题。
+- **多图下载**: 通过`DownloadImages` API，用户可同时下载多张图片，需要输入由图片ID和URL组成的结构体数组。
+- **缓存**: 使用虚幻引擎的`SaveGame`功能实现图片缓存，避免同一图片ID的重复下载。
+- **自定义设置**: 支持定制化设置，如缓存图片的默认位置、最大并行下载数量和缓存方式。
+- **缓存方式**: 可选择使用`SaveGame`或本地文件缓存，或两者同时使用。
+- **简易操作**: 只需调用一个蓝图节点`DownloadImages`即可实现多图下载，无需编写复杂代码。
+
+## 使用前提
+
+- 本插件使用虚幻引擎5.3开发，确保项目使用虚幻引擎版本为5.3或更高。
+- **注意**: 建议使用图片的URL或URL的文件名作为图片ID，以保证ID的唯一性和更新性。
 
 ## 兼容性
-- 本插件使用虚幻引擎5.1开发，由于未广泛使用API，因此应易于修改以适用于虚幻4和虚幻5的更高版本。对此感兴趣的开发者可参与添加其他版本的分支。
+
+- 使用虚幻引擎5.3开发，易于修改以适应虚幻4和更高版本的虚幻5。对此有兴趣的开发者可参与添加其他版本支持。
 
 ## 示例
-- 打开插件Content目录下的 `UEDownloadImagesExample` 地图，运行游戏，点击运行即可看到效果，具体调用请参阅GameMode下面的BP_UEDownloadImagesController。
 
+- 在插件的`Content`目录下打开`UEDownloadImagesExample`地图，运行游戏并点击运行，即可见效果。具体调用方法请参见`GameMode`下的`BP_UEDownloadImagesController`。
 
 ## 交流与建议
-- 如对本插件有更多的功能需求或建议，欢迎在issues区留言讨论。
+
+- 对插件有功能需求或建议，请在issues区留言讨论。
 
 ## 未来更新
-- **单图下载与缓存**: 将增加 `DownloadImageWithCache` API，支持单张图片下载及自动缓存或读取缓存功能。
-- **项目设置优化**: 提供更多项目设置选项，增强用户自定义体验。
+
+- **方法参数更新**: 在`DownloadImages`方法中增加是否缓存的参数及缓存方式参数，可在调用时实时覆盖项目设置。
 
 ## 应用场景
-虽然在游戏开发中不常见，但本插件可快速解决特定需求，特别适用于需要下载和管理多张图片的场景。
 
+虽不常见于游戏开发，本插件迅速解决特定需求，特别适用于需要下载和管理多张图片的场景。
 
 
 
