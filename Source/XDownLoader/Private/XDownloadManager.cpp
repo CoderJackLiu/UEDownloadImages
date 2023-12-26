@@ -247,7 +247,6 @@ void UXDownloadManager::InitTask()
 	OnTotalDownloadSucceed.Clear();
 	OnTotalDownloadFailed.Clear();
 	OnTotalDownloadProgress.Clear();
-	TaskQueue.Empty();
 	DownloadFailNum = 0;
 	TotalDownloadResult = FTotalDownloadResult();
 }
@@ -269,31 +268,28 @@ void UXDownloadManager::DestroyTask()
 
 void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 {
-	FScopeLock ScopeLock(&ExecutingXDownloadTaskPoolLock);
-	{
-		FPlatformAtomics::InterlockedDecrement(&CurrentParallelDownloads);
-		FPlatformAtomics::InterlockedDecrement(&CurrentTaskDownloadingNum);
-		//log succeed
-		UE_LOG(LogTemp, Warning, TEXT("Download Succeed!!! ImageID :%s ,URL:%s"), * InTaskResult.ImageID, *InTaskResult.ImageURL);
-		UpdateAllProgress();
-		TotalDownloadResult.SubTaskDownloadResults.Add(InTaskResult);
+	FPlatformAtomics::InterlockedDecrement(&CurrentParallelDownloads);
+	FPlatformAtomics::InterlockedDecrement(&CurrentTaskDownloadingNum);
+	//log succeed
+	UE_LOG(LogTemp, Warning, TEXT("Download Succeed!!! ImageID :%s ,URL:%s"), * InTaskResult.ImageID, *InTaskResult.ImageURL);
+	UpdateAllProgress();
+	TotalDownloadResult.SubTaskDownloadResults.Add(InTaskResult);
 
-		if (!IsGameWorldValid())
+	if (!IsGameWorldValid())
+	{
+		DestroyTask();
+		return;
+	}
+	if (CurrentTasks.Num() == 0)
+	{
+		if (CurrentTaskDownloadingNum == 0)
 		{
-			DestroyTask();
-			return;
+			MakeAllTaskFinished();
 		}
-		if (CurrentTasks.Num() == 0)
-		{
-			if (CurrentTaskDownloadingNum == 0)
-			{
-				MakeAllTaskFinished();
-			}
-		}
-		else
-		{
-			ExecuteNextTask();
-		}
+	}
+	else
+	{
+		ExecuteNextTask();
 	}
 }
 
@@ -510,6 +506,6 @@ void UXDownloadManager::ExecuteNextTask()
 	else
 	{
 		//log alone task object not finish but queue is empty
-		UE_LOG(LogTemp, Error, TEXT("alone task object not finish but queue is empty!!!"));
+		UE_LOG(LogTemp, Warning, TEXT("TaskQueue peek failed, all task finished dequeue!!!"));
 	}
 }
