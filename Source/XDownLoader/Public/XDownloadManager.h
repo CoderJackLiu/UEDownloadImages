@@ -247,7 +247,7 @@ private:
 	 * It should be called periodically to keep track of the ongoing downloads and notify the progress changes.
 	 *
 	 */
-	void UpdateAllProgress();
+	void UpdateAllProgress(const FDownloadResult& InTaskResult);
 
 	/**
 	 * @brief Executes all remaining tasks in the download manager.

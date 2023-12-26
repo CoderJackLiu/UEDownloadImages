@@ -176,15 +176,14 @@ struct FXDownloadImageCached
 	bool operator==(const FXDownloadImageCached& Other) const
 	{
 		//log error imageID
-		UE_LOG(LogTemp, Warning, TEXT("ImageID: %s"), *ImageID);
+		// UE_LOG(LogTemp, Warning, TEXT("ImageID: %s"), *ImageID);
 		return ImageID == Other.ImageID;
 	}
 
 	//operator ==
 	bool operator==(const FString& InID) const
 	{
-		UE_LOG(LogTemp, Warning, TEXT("ImageID: %s"), *ImageID);
-
+		// UE_LOG(LogTemp, Warning, TEXT("ImageID: %s"), *ImageID);
 		return ImageID == InID;
 	}
 

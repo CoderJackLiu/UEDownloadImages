@@ -258,7 +258,7 @@ void UXDownloadManager::DestroyTask()
 		DownLoadRequest->OnProcessRequestComplete().Unbind();
 		DownLoadRequest->OnRequestProgress().Unbind();
 		DownLoadRequest.Get().CancelRequest();
-		UE_LOG(LogTemp, Warning, TEXT("DownloadManager http request unbind  url is  %s !!!!"), *DownLoadRequest->GetURL());
+		// UE_LOG(LogTemp, Warning, TEXT("DownloadManager http request unbind  url is  %s !!!!"), *DownLoadRequest->GetURL());
 	}
 	DownLoadRequests.Empty();
 	DownloadManagers.Remove(this);
@@ -272,8 +272,7 @@ void UXDownloadManager::MakeSubTaskSucceed(const FDownloadResult& InTaskResult)
 	FPlatformAtomics::InterlockedDecrement(&CurrentTaskDownloadingNum);
 	//log succeed
 	UE_LOG(LogTemp, Warning, TEXT("Download Succeed!!! ImageID :%s ,URL:%s"), * InTaskResult.ImageID, *InTaskResult.ImageURL);
-	UpdateAllProgress();
-	TotalDownloadResult.SubTaskDownloadResults.Add(InTaskResult);
+	UpdateAllProgress(InTaskResult);
 
 	if (!IsGameWorldValid())
 	{
@@ -302,8 +301,7 @@ void UXDownloadManager::MakeSubTaskError(const FDownloadResult& InTaskResult)
 		FPlatformAtomics::InterlockedIncrement(&DownloadFailNum);
 		FPlatformAtomics::InterlockedDecrement(&CurrentParallelDownloads);
 		FPlatformAtomics::InterlockedDecrement(&CurrentTaskDownloadingNum);
-		TotalDownloadResult.SubTaskDownloadResults.Add(InTaskResult);
-		UpdateAllProgress();
+		UpdateAllProgress(InTaskResult);
 		//log error  log InTaskResult.ImageID
 		UE_LOG(LogTemp, Error, TEXT("Download failed!!! ImageID :%s ,URL:%s"), * InTaskResult.ImageID, *InTaskResult.ImageURL);
 
@@ -321,11 +319,12 @@ void UXDownloadManager::MakeSubTaskError(const FDownloadResult& InTaskResult)
 	}
 }
 
-void UXDownloadManager::UpdateAllProgress()
+void UXDownloadManager::UpdateAllProgress(const FDownloadResult& InTaskResult)
 {
-	AsyncTask(ENamedThreads::GameThread, [this]()
+	AsyncTask(ENamedThreads::GameThread, [this,InTaskResult]()
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Download progress!!!"));
+		TotalDownloadResult.SubTaskDownloadResults.Add(InTaskResult);
 		OnTotalDownloadProgress.Broadcast(TotalDownloadResult);
 	});
 }
